@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TestingPlatform.Application.Dtos;
 using TestingPlatform.Application.Interfaces;
+using TestingPlatform.Infrastructure.Exceptions;
 using TestingPlatform.Models;
 
 namespace TestingPlatform.Infrastructure.Repositories
@@ -45,6 +46,8 @@ namespace TestingPlatform.Infrastructure.Repositories
         
         public async Task<IEnumerable<TestDto>> GetAllAsync(bool? isPublic, List<int> groupsIds, List<int> studentsIds)
         {
+            await RefreshPublicationStatusAsync();
+
             var tests = appDbContext.Tests
                  .OrderByDescending(x => x.PublishedAt)
                  .ThenBy(t => t.Title)
@@ -68,6 +71,8 @@ namespace TestingPlatform.Infrastructure.Repositories
 
         public async Task<IEnumerable<TestDto>> GetAllForStudentsAsync(int studentId)
         {
+            await RefreshPublicationStatusAsync();
+
             var tests = await appDbContext.Tests
                  .Where(t => t.IsPublic)
                  .Where(t =>
@@ -84,6 +89,8 @@ namespace TestingPlatform.Infrastructure.Repositories
       
         public async Task<IEnumerable<TestDto>> GetByIdAsync(int id)
         {
+            await RefreshPublicationStatusAsync();
+
             var tests = await appDbContext.Tests
                 
                 .Include(t => t.Directions)
@@ -99,13 +106,17 @@ namespace TestingPlatform.Infrastructure.Repositories
                 .FirstOrDefaultAsync(t => t.Id == id);
 
             if (tests == null)
-                throw new Exception("Тест не найден");
-            
+            {
+                throw new EntityNotFoundException("тест не найден");
+            }
+                
             return mapper.Map<IEnumerable<TestDto>>(tests);
         }
 
         public async Task<IEnumerable<TestDto>> GetTopRecentAsync(int count = 5)
         {
+            await RefreshPublicationStatusAsync();
+
             var tests = await appDbContext.Tests.AsNoTracking()
                 .OrderByDescending(t => t.PublishedAt)
                 .ThenByDescending(t => t.Id)
@@ -127,7 +138,7 @@ namespace TestingPlatform.Infrastructure.Repositories
             var test = await appDbContext.Tests.FirstOrDefaultAsync(t => t.Id == testDto.Id);
 
             if (test == null)
-                throw new Exception("Тест не найден");
+                throw new EntityNotFoundException("Тест не найден");
 
             test.Title = testDto.Title;
             test.Description = testDto.Description;
@@ -143,7 +154,7 @@ namespace TestingPlatform.Infrastructure.Repositories
             await appDbContext.SaveChangesAsync();
         }
 
-        public async Task UpdateMembersTest(Test test, TestDto testDto)
+        private async Task UpdateMembersTest(Test test, TestDto testDto)
         {
             var studentIds = testDto.Students?.Select(x => x.Id)
                 .Where(id => id > 0)
@@ -233,6 +244,92 @@ namespace TestingPlatform.Infrastructure.Repositories
                     test.Projects.Add(p);
             }
         } 
+
+        private async Task RefreshPublicationStatusAsync()
+        {
+            var now = DateTimeOffset.UtcNow;
+
+            var publishCandidates  = await appDbContext.Tests
+                .AsNoTracking()
+                .Where(t => !t.IsPublic && (t.PublishedAt != null || t.Deadlinen != null))
+                .Select(t => new {t.Id, t.PublishedAt,t.Deadlinen})
+                .ToListAsync();
+
+            var toPublishIds = publishCandidates
+                .Where(x => x.PublishedAt != null && x.PublishedAt <= now && (x.Deadlinen == null || x.Deadlinen > now))
+                      
+                .Select(x => x.Id)
+                .ToList();
+
+            if(toPublishIds.Count > 0)
+                await appDbContext.Tests
+                    .Where(t => toPublishIds.Contains(t.Id))
+                    .ExecuteUpdateAsync(t => t.SetProperty(t => t.IsPublic, true));
+
+            
+            var unPublishCandidates = await appDbContext.Tests
+                .AsNoTracking()
+                .Where(t => t.IsPublic && (t.PublishedAt != null || t.Deadlinen != null))
+                .Select(t => new { t.Id, t.PublishedAt, t.Deadlinen })
+                .ToListAsync();
+
+            var toUnpublishIds = unPublishCandidates
+                .Where(x => x.PublishedAt == null
+                || (x.Deadlinen != null && x.Deadlinen <= now))
+                .Select(x => x.Id)
+                .ToList();
+
+
+            if (toUnpublishIds.Count > 0)
+                await appDbContext.Tests
+                    .Where(t => toUnpublishIds.Contains(t.Id))
+                    .ExecuteUpdateAsync(t => t.SetProperty(t => t.IsPublic, false));
+
+
+        }
+
+        public async Task<IEnumerable<object>> GetTestByTypeAsync() 
+        {
+            var t = await appDbContext.Tests
+                .AsNoTracking()
+                .GroupBy(t => t.Type)
+                .Select(g => new 
+                {
+                    Type = g.Key,
+                    Count  = g.Count()
+                })
+                .ToListAsync();
+            
+            
+            return t;
+        }
+
+        public async Task<IEnumerable<object>> GetTestTimeLineByPublicAsync()
+        {
+            return await appDbContext.Tests
+                .AsNoTracking()
+                .Where(t => t.PublishedAt != default)
+                .GroupBy(t => new
+                {
+                    t.IsPublic,
+                    Year = t.PublishedAt.Year,
+                    Month = t.PublishedAt.Month
+                })
+                .Select(g => new
+                {
+                    g.Key.IsPublic,
+                    g.Key.Year,
+                    g.Key.Month,
+                    Count = g.Count()
+                })
+                .ToListAsync();
+
+
+
+
+
+
+        }
 
     }
 }

@@ -4,7 +4,9 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using TestingPlatform.Application.Dtos;
 using TestingPlatform.Application.Interfaces;
+using TestingPlatform.Infrastructure.Exceptions;
 using TestingPlatform.Models;
+using static System.Net.Mime.MediaTypeNames;
 
 
 
@@ -36,7 +38,10 @@ namespace TestingPlatform.Infrastructure.Repositories
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Id == id);
 
-            if (group is null) throw new Exception("Группа не найдена");
+            if (group == null)
+            {
+                throw new EntityNotFoundException("тест не найден");
+            }
 
             return mapper.Map<GroupDto>(group);
         }
@@ -49,11 +54,11 @@ namespace TestingPlatform.Infrastructure.Repositories
             var course = await _appDbContext.Courses.FirstOrDefaultAsync(c => c.Id == group.CourseId);
             var project = await _appDbContext.Projects.FirstOrDefaultAsync(p => p.Id == group.ProjectId);
 
-            if (direction is null) throw new Exception("Убедитесь что направление существует");
+            if (direction is null) throw new EntityNotFoundException("Убедитесь что направление существует");
             group.Direction = direction;
-            if (course is null) throw new Exception("Убедитесь что курс существует");
+            if (course is null) throw new EntityNotFoundException("Убедитесь что курс существует");
             group.Course = course;
-            if (project is null) throw new Exception("Убедитесь что проект существует");
+            if (project is null) throw new EntityNotFoundException("Убедитесь что проект существует");
             group.Project = project;
 
             if (group.Students.Any())
@@ -62,7 +67,7 @@ namespace TestingPlatform.Infrastructure.Repositories
                 var students = _appDbContext.Students.Where(x => ids.Contains(x.Id)).ToList();
 
                 if (students.Count != ids.Count)
-                    throw new Exception("Некоторые студенты не найдены");
+                    throw new EntityNotFoundException("Некоторые студенты не найдены");
 
                 group.Students = students;
             }
@@ -76,7 +81,7 @@ namespace TestingPlatform.Infrastructure.Repositories
         public async Task UpdateAsync(GroupDto groupDto, int id)
         {
             var group = await _appDbContext.Groups.FirstOrDefaultAsync(g => g.Id == id);
-            if (group is null) throw new Exception("Группа не найдена");
+            if (group is null) throw new EntityNotFoundException("Группа не найдена");
 
 
             group.Name = groupDto.Name;
@@ -91,7 +96,7 @@ namespace TestingPlatform.Infrastructure.Repositories
         {
             var group = await _appDbContext.Groups.FirstOrDefaultAsync(g => g.Id == id);
 
-            if (group is null) throw new Exception("Группа не найдена");
+            if (group is null) throw new EntityNotFoundException("Группа не найдена");
 
              _appDbContext.Groups.Remove(group);
             await _appDbContext.SaveChangesAsync();

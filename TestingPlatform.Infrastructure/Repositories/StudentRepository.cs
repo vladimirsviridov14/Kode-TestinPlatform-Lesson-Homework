@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TestingPlatform.Application.Dtos;
 using TestingPlatform.Application.Interfaces;
+using TestingPlatform.Infrastructure.Exceptions;
 using TestingPlatform.Models;
 
 namespace TestingPlatform.Infrastructure.Repositories
@@ -56,8 +57,8 @@ namespace TestingPlatform.Infrastructure.Repositories
               .AsNoTracking()
               .FirstOrDefaultAsync(s => s.Id == id);
 
-            if(students == null) 
-                throw new Exception("Студент не найден");
+            if(students == null)
+                throw new EntityNotFoundException("Студент не найден");
 
             return mapper.Map<StudentDto>(students);
         }
@@ -65,8 +66,8 @@ namespace TestingPlatform.Infrastructure.Repositories
         public async Task UpdateAsync(StudentDto studentDto, int id)
         {
            var student = await _appDbContext.Students.FirstOrDefaultAsync(s => s.Id == id);
-            if(student == null) 
-                throw new Exception("Студент не найден");
+            if(student == null)
+                throw new EntityNotFoundException("Студент не найден");
             student.Phone = studentDto.Phone;
             student.VKProfileLink = studentDto.VKProfileLink;
            
@@ -77,6 +78,29 @@ namespace TestingPlatform.Infrastructure.Repositories
         Task<List<StudentDto>> IStudentRepository.GetAllAsync()
         {
             throw new NotImplementedException();
+        }
+
+
+        public async Task GetStudentByIdAsync(int id)
+        {
+            var student = await _appDbContext.Students
+                .Include(s => s.User)
+                .Include(s => s.Tests)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(student => student.UserId == id);
+
+            if (student == null)
+            {
+                throw new EntityNotFoundException("студент не найден");
+
+            }
+
+            return mapper.Map<StudentDto>(student);
+
+
+
+
+
         }
     }
 }
