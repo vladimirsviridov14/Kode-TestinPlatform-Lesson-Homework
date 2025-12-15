@@ -5,12 +5,12 @@ namespace TestingPlatform.Models
 {
     public class Attempt
     {
-        public int id {  get; set; }
+        public int Id { get; set; }
 
         [DefaultValue("CURRENT_TIMESTAMP")]
-        public DateTimeOffset? StartedAt { get; set; }
+        public DateTime StartedAt { get; set; }
 
-        public DateTimeOffset SubmittedAt { get; set; }
+        public DateTime? SubmittedAt { get; set; }
 
         public int? Score { get; set; }
 
@@ -19,12 +19,10 @@ namespace TestingPlatform.Models
 
         [Required]
         public int StudentId { get; set; }
-
-        //навигация
         public Test Test { get; set; }
 
         public Student Student { get; set; }
 
-        public List<UserAttemptAnswer> UserAttemptAnswers { get; set; }
+        public List<UserAttemptsAnswer> UserAttemptsAnswer { get; set; }
     }
 }

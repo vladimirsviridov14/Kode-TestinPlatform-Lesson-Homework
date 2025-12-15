@@ -9,7 +9,7 @@ namespace TestingPlatform.Models
         public int Id { get; set; }
         public string Name { get; set; }
 
-        public List<Test> Groups { get; set; }
+        public List<Group> Groups { get; set; }
 
     }
 }

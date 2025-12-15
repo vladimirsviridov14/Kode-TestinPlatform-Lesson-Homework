@@ -13,11 +13,9 @@ public class Answer
     public bool IsCorrect { get; set; }
 
     [Required]
-    public int QuestionId  {  get; set; } 
+    public int QuestionId { get; set; }
 
-    //навгиация
-    public Question Question {  get; set; }
-    public List<UserSelectedOption> UserSelectedOptions {  get; set; }
+    public Questions Question { get; set; }
 
 
 }
